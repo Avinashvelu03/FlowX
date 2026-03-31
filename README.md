@@ -428,8 +428,8 @@ try {
 ## Contributing
 
 ```bash
-git clone https://github.com/Avinashvelu03/FlowX.git
-cd FlowX
+git clone https://github.com/Avinashvelu03/flowx-control.git
+cd flowx-control
 npm install
 npm test          # Run tests with 100% coverage
 npm run lint      # ESLint
