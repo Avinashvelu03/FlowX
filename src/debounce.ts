@@ -50,8 +50,6 @@ export function debounce<TArgs extends any[], TReturn>(
   let isPending = false;
 
   async function invoke(): Promise<void> {
-    if (!lastArgs && pendingResolvers.length === 0) return;
-
     const args = lastArgs!;
     const resolvers = pendingResolvers.splice(0);
     lastArgs = null;

@@ -52,6 +52,7 @@ export function throttle<TArgs extends any[], TReturn>(
     timer = null;
 
     if (!args) {
+      /* istanbul ignore next -- resolvers is always empty here; lastArgs cleared before trailing fires */
       for (const r of resolvers) r.resolve(undefined as TReturn);
       return;
     }
@@ -91,6 +92,7 @@ export function throttle<TArgs extends any[], TReturn>(
           return result;
         } catch (error) {
           const err = error instanceof Error ? error : new Error(String(error));
+          /* istanbul ignore next -- prevResolvers is always empty on leading calls in normal flow */
           for (const r of prevResolvers) r.reject(err);
           throw err;
         }

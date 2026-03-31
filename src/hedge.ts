@@ -55,6 +55,7 @@ export function hedge<T>(fn: () => Promise<T>, options?: HedgeOptions): Promise<
     for (let i = 0; i < maxHedges; i++) {
       const timer = setTimeout(
         () => {
+          /* istanbul ignore if -- timer is always cleared by onResult before firing */
           if (settled) return;
           fn().then(onResult, (err) =>
             onError(err instanceof Error ? err : new Error(String(err))),

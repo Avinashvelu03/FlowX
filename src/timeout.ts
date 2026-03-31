@@ -33,71 +33,52 @@ export async function withTimeout<T>(
     throw new AbortError();
   }
 
-  return new Promise<T>((resolve, reject) => {
-    let settled = false;
+  const fnResult = fn(); // call synchronously so sync throws propagate
 
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-
-      if (options?.fallback !== undefined) {
-        const fb = options.fallback;
-        if (typeof fb === 'function') {
-          try {
-            const result = (fb as () => T | Promise<T>)();
-            Promise.resolve(result).then(resolve, reject);
-          } catch (err) {
-            reject(err);
+  return Promise.race([
+    Promise.resolve(fnResult),
+    new Promise<T>((_, reject) => {
+      const timer = setTimeout(() => {
+        if (options?.fallback !== undefined) {
+          const fb = options.fallback;
+          if (typeof fb === 'function') {
+            try {
+              const result = (fb as () => T | Promise<T>)();
+              Promise.resolve(result).then(
+                (v) => reject({ __resolved: true, value: v } as any),
+                reject,
+              );
+            } catch (err) {
+              reject(err);
+            }
+          } else {
+            reject({ __resolved: true, value: fb } as any);
           }
         } else {
-          resolve(fb);
+          reject(new TimeoutError(options?.message));
         }
-      } else {
-        reject(new TimeoutError(options?.message));
-      }
-    }, ms);
+      }, ms);
 
-    const onAbort = () => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(new AbortError());
-    };
-
-    if (options?.signal) {
-      options.signal.addEventListener('abort', onAbort, { once: true });
-    }
-
-    try {
-      const result = fn();
-      Promise.resolve(result).then(
-        (value) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          if (options?.signal) {
-            options.signal.removeEventListener('abort', onAbort);
-          }
-          resolve(value);
-        },
-        (error) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          if (options?.signal) {
-            options.signal.removeEventListener('abort', onAbort);
-          }
-          reject(error);
-        },
-      );
-    } catch (error) {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
+      // If signal aborts, reject the race
       if (options?.signal) {
-        options.signal.removeEventListener('abort', onAbort);
+        const onAbort = () => {
+          clearTimeout(timer);
+          reject(new AbortError());
+        };
+        options.signal.addEventListener('abort', onAbort, { once: true });
       }
-      reject(error);
+
+      // Clean up timer when fn resolves
+      Promise.resolve(fnResult).then(
+        () => clearTimeout(timer),
+        () => clearTimeout(timer),
+      );
+    }),
+  ]).catch((err) => {
+    // Handle the fallback resolution hack
+    if (err && typeof err === 'object' && '__resolved' in err) {
+      return err.value as T;
     }
+    throw err;
   });
 }

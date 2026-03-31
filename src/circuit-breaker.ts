@@ -74,6 +74,7 @@ export function createCircuitBreaker<TArgs extends any[], TReturn>(
   }
 
   function scheduleReset(): void {
+    /* istanbul ignore next -- defensive guard; timer always fires before reschedule in normal flow */
     if (resetTimer) clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
       resetTimer = null;

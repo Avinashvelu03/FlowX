@@ -101,13 +101,13 @@ describe('createRateLimiter', () => {
 
   it('should clear drainTimer and resolve queued items on reset', async () => {
     const limiter = createRateLimiter({ limit: 1, interval: 100, strategy: 'queue' });
-    
+
     await limiter.execute(() => 1);
     const p1 = limiter.execute(() => 2);
     const p2 = limiter.execute(() => 3);
-    
+
     limiter.reset();
-    
+
     await expect(p1).resolves.toBe(2);
     await expect(p2).resolves.toBe(3);
   });

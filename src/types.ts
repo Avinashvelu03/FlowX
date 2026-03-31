@@ -76,19 +76,22 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       reject(new AbortError());
       return;
     }
-    const timer = setTimeout(resolve, ms);
+
+    let onAbort: (() => void) | undefined;
+
+    const timer = setTimeout(() => {
+      if (signal && onAbort) {
+        signal.removeEventListener('abort', onAbort);
+      }
+      resolve();
+    }, ms);
+
     if (signal) {
-      const onAbort = () => {
+      onAbort = () => {
         clearTimeout(timer);
         reject(new AbortError());
       };
       signal.addEventListener('abort', onAbort, { once: true });
-      // Clean up listener once timer fires
-      const originalResolve = resolve;
-      resolve = () => {
-        signal.removeEventListener('abort', onAbort);
-        originalResolve();
-      };
     }
   });
 }

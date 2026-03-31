@@ -116,14 +116,14 @@ describe('throttle', () => {
     jest.useFakeTimers();
     const fn = jest.fn().mockResolvedValue('ok');
     const throttled = throttle(fn, 50, { leading: true, trailing: true });
-    
-    throttled('a').catch(()=>{}); // leading
-    throttled('b').catch(()=>{}); // queues trailing timer for wait=50
-    
+
+    throttled('a').catch(() => {}); // leading
+    throttled('b').catch(() => {}); // queues trailing timer for wait=50
+
     jest.setSystemTime(jest.now() + 60);
     // Call again before timer expires in event loop
-    throttled('c').catch(()=>{}); 
-    
+    throttled('c').catch(() => {});
+
     jest.useRealTimers();
   });
 });

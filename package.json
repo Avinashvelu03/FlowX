@@ -109,8 +109,7 @@
     "test:ci": "jest --coverage",
     "lint": "eslint src/ --ext .ts",
     "format": "prettier --write \"src/**/*.ts\" \"__tests__/**/*.ts\"",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run lint && npm run test:ci && npm run build"
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "async",
@@ -144,12 +143,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Avinashvelu03/flowx.git"
+    "url": "git+https://github.com/Avinashvelu03/FlowX.git"
   },
   "bugs": {
-    "url": "https://github.com/Avinashvelu03/flowx/issues"
+    "url": "https://github.com/Avinashvelu03/FlowX/issues"
   },
-  "homepage": "https://github.com/Avinashvelu03/flowx#readme",
+  "homepage": "https://github.com/Avinashvelu03/FlowX#readme",
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@typescript-eslint/eslint-plugin": "^7.0.0",

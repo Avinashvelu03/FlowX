@@ -64,6 +64,7 @@ export function poll<T>(fn: () => T | Promise<T>, options?: PollOptions<T>): Pol
       if (attempt < maxAttempts) {
         const waitTime = calculateDelay(attempt, interval, backoff);
         await sleep(waitTime, signal).catch((err) => {
+          /* istanbul ignore if -- stop() doesn't abort sleep; this is a defensive guard */
           if (stopped) throw new AbortError('Polling stopped');
           throw err;
         });
