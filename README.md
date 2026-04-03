@@ -32,13 +32,7 @@
 
 ```bash
 npm install flowx-control
-```
-
-```bash
 yarn add flowx-control
-```
-
-```bash
 pnpm add flowx-control
 ```
 
@@ -56,19 +50,19 @@ const data = await retry(() => fetch('/api/data'), {
   backoff: 'exponential',
 });
 
-// Circuit breaker — stop cascading failures
+// Circuit breaker
 const breaker = createCircuitBreaker(fetchUser, {
   failureThreshold: 5,
   resetTimeout: 30_000,
 });
 const user = await breaker.fire(userId);
 
-// Timeout — never wait forever
+// Timeout
 const result = await withTimeout(() => fetch('/slow'), 5000, {
   fallback: () => cachedResponse,
 });
 
-// Rate limiter — respect API limits
+// Rate limiter
 const limiter = createRateLimiter({ limit: 10, interval: 1000 });
 await limiter.execute(() => callExternalApi());
 ```
@@ -79,266 +73,36 @@ await limiter.execute(() => callExternalApi());
 
 ### 🛡️ Resilience
 
-#### retry — Retry with backoff & jitter
+- **retry** — Exponential backoff, jitter, abort signal, custom retry predicates
+- **circuitBreaker** — Closed/Open/Half-open state machine, trip hooks
+- **fallback** — Graceful degradation with fallback chains
+- **timeout** — Hard deadline + optional fallback value
 
-```ts
-import { retry } from 'flowx-control/retry';
-
-const data = await retry(() => fetch('/api'), {
-  maxAttempts: 5,
-  delay: 1000,
-  backoff: 'exponential',   // 'fixed' | 'linear' | 'exponential' | custom fn
-  jitter: true,
-  retryIf: (err) => err.status !== 404,
-  onRetry: (err, attempt) => console.log(`Attempt ${attempt}`),
-  signal: abortController.signal,
-});
-```
-#### circuitBreaker — Stop cascading failures
-
-```ts
-import { createCircuitBreaker } from 'flowx-control/circuit-breaker';
-
-const breaker = createCircuitBreaker(callApi, {
-  failureThreshold: 5,
-  resetTimeout: 30000,
-  halfOpenLimit: 1,
-  successThreshold: 2,
-  shouldTrip: (err) => err.status >= 500,
-  onStateChange: (from, to) => log(`${from} → ${to}`),
-});
-
-const result = await breaker.fire(args);
-console.log(breaker.state);       // 'closed' | 'open' | 'half-open'
-console.log(breaker.failureCount);
-breaker.reset();
-```
-#### fallback — Graceful degradation
-
-```ts
-import { withFallback, fallbackChain } from 'flowx-control/fallback';
-
-const data = await withFallback(
-  () => fetchFromPrimary(),
-  'default-value',
-  { onFallback: (err, idx) => console.warn(err) }
-);
-
-const result = await fallbackChain([
-  () => fetchFromPrimary(),
-  () => fetchFromCache(),
-  () => fetchFromFallback(),
-]);
-```
-#### timeout — Never wait forever
-
-```ts
-import { withTimeout } from 'flowx-control/timeout';
-
-const result = await withTimeout(() => fetch('/slow-api'), 5000, {
-  fallback: () => cachedData,
-  message: 'API took too long',
-  signal: controller.signal,
-});
-```
 ### 🚦 Concurrency
 
-#### bulkhead — Isolate concurrent operations
+- **bulkhead** — Max concurrent + max queue isolation
+- **queue** — Priority async task queue with concurrency
+- **semaphore** — Counting resource lock (acquire/release)
+- **mutex** — Mutual exclusion for critical sections
 
-```ts
-import { createBulkhead } from 'flowx-control/bulkhead';
-
-const bulkhead = createBulkhead({
-  maxConcurrent: 10,
-  maxQueue: 100,
-  queueTimeout: 5000,
-});
-
-const result = await bulkhead.execute(() => processRequest());
-console.log(bulkhead.activeCount, bulkhead.queueSize);
-```
-#### queue — Priority async task queue
-
-```ts
-import { createQueue } from 'flowx-control/queue';
-
-const queue = createQueue({ concurrency: 5, timeout: 10000 });
-
-const result = await queue.add(() => processJob(), { priority: 1 });
-const results = await queue.addAll(tasks.map(t => () => process(t)));
-
-await queue.onIdle(); // wait until all done
-queue.pause();
-queue.resume();
-```
-#### semaphore — Counting resource lock
-
-```ts
-import { createSemaphore } from 'flowx-control/semaphore';
-
-const sem = createSemaphore(3); // max 3 concurrent
-const release = await sem.acquire();
-try {
-  await doWork();
-} finally {
-  release();
-}
-```
-#### mutex — Mutual exclusion lock
-
-```ts
-import { createMutex } from 'flowx-control/mutex';
-
-const mutex = createMutex();
-const release = await mutex.acquire();
-try {
-  await criticalSection();
-} finally {
-  release();
-}
-```
 ### 🎛️ Flow Control
 
-#### rateLimit — Token bucket rate limiting
+- **rateLimit** — Token bucket with queue/reject strategies
+- **throttle** — Leading/trailing edge, cancellable
+- **debounce** — maxWait support, flush/cancel
+- **batch** — Process collections in chunks with progress
+- **pipeline** — Compose sync/async operations
 
-```ts
-import { createRateLimiter } from 'flowx-control/rate-limit';
-
-const limiter = createRateLimiter({
-  limit: 100,
-  interval: 60_000,
-  strategy: 'queue',   // 'queue' | 'reject'
-});
-
-await limiter.execute(() => callApi());
-console.log(limiter.remaining);
-limiter.reset();
-```
-#### throttle — Rate-limit function calls
-
-```ts
-import { throttle } from 'flowx-control/throttle';
-
-const save = throttle(saveToDb, 1000, {
-  leading: true,
-  trailing: true,
-});
-
-await save(data);
-save.cancel();
-```
-#### debounce — Delay until activity pauses
-
-```ts
-import { debounce } from 'flowx-control/debounce';
-
-const search = debounce(searchApi, 300, {
-  leading: false,
-  trailing: true,
-  maxWait: 1000,
-});
-
-await search(query);
-await search.flush();
-search.cancel();
-```
-#### batch — Process collections in chunks
-
-```ts
-import { batch } from 'flowx-control/batch';
-
-const result = await batch(urls, async (url, i) => {
-  return fetch(url).then(r => r.json());
-}, {
-  batchSize: 10,
-  concurrency: 3,
-  onProgress: (done, total) => console.log(`${done}/${total}`),
-  signal: controller.signal,
-});
-
-console.log(result.succeeded, result.failed, result.errors);
-```
-#### pipeline — Compose async operations
-
-```ts
-import { pipeline, pipe } from 'flowx-control/pipeline';
-
-const transform = pipe(
-  (input: string) => input.trim(),
-  (str) => str.toUpperCase(),
-  async (str) => await translate(str),
-);
-
-const result = await transform('  hello world  ');
-```
 ### 🛠️ Utilities
 
-#### poll — Repeated polling with backoff
-
-```ts
-import { poll } from 'flowx-control/poll';
-
-const { result, stop } = poll(() => checkJobStatus(jobId), {
-  interval: 2000,
-  until: (status) => status === 'complete',
-  maxAttempts: 30,
-  backoff: 'exponential',
-  signal: controller.signal,
-});
-
-const finalStatus = await result;
-```
-#### hedge — Hedged/speculative requests
-
-```ts
-import { hedge } from 'flowx-control/hedge';
-
-// If primary doesn't respond in 200ms, fire a parallel request
-const data = await hedge(() => fetch('/api'), {
-  delay: 200,
-  maxHedges: 2,
-});
-```
-#### memo — Async memoization with TTL
-
-```ts
-import { memo } from 'flowx-control/memo';
-
-const cachedFetch = memo(fetchUserById, {
-  ttl: 60_000,
-  maxSize: 1000,
-  key: (id) => `user:${id}`,
-});
-
-const user = await cachedFetch(123);
-cachedFetch.clear();
-```
-#### deferred — Externally resolvable promise
-
-```ts
-import { deferred } from 'flowx-control/deferred';
-
-const d = deferred<string>();
-setTimeout(() => d.resolve('hello'), 1000);
-const value = await d.promise; // 'hello'
-```
----
-
-## Deep Imports (Tree-shaking)
-
-Import only what you need — zero unused code in your bundle:
-
-```ts
-// Only pulls in ~2KB instead of the full 28KB
-import { retry } from 'flowx-control/retry';
-import { createQueue } from 'flowx-control/queue';
-```
+- **poll** — Repeated polling with backoff until condition
+- **hedge** — Speculative parallel requests
+- **memo** — Async memoization with TTL + max size
+- **deferred** — Externally resolvable promise
 
 ---
 
 ## Error Hierarchy
-
-All errors extend `FlowXError` with a machine-readable `code`:
 
 | Error | Code | Thrown by |
 |-------|------|----------|
@@ -347,18 +111,6 @@ All errors extend `FlowXError` with a machine-readable `code`:
 | `BulkheadError` | `ERR_BULKHEAD_FULL` | `bulkhead` |
 | `AbortError` | `ERR_ABORTED` | `poll`, `batch`, `timeout` |
 | `RateLimitError` | `ERR_RATE_LIMIT` | `rateLimit` |
-
-```ts
-import { TimeoutError, FlowXError } from 'flowx-control';
-
-try {
-  await withTimeout(fn, 1000);
-} catch (err) {
-  if (err instanceof TimeoutError) {
-    console.log(err.code); // 'ERR_TIMEOUT'
-  }
-}
-```
 
 ---
 
@@ -378,11 +130,9 @@ try {
 
 ```bash
 git clone https://github.com/Avinashvelu03/flowx-control.git
-cd flowx-control
-npm install
-npm test          # Run tests with 100% coverage
-npm run lint      # ESLint
-npm run build     # Build ESM + CJS + DTS
+cd flowx-control && npm install
+npm test
+npm run build
 ```
 
 ---
@@ -391,3 +141,33 @@ npm run build     # Build ESM + CJS + DTS
 
 MIT © [Avinash](https://github.com/Avinashvelu03)
 
+---
+
+## ⚡ Fuel the Flow
+
+<div align="center">
+
+```
+  · · · · · · · · · · · · · · · · · · · · · · · ·
+  ·                                       ·
+  ·   FlowX handles your retries,          ·
+  ·   your circuit breakers,               ·
+  ·   your race conditions,                ·
+  ·   and your 3 AM production fires.      ·
+  ·                                       ·
+  ·   If it earned your trust — fuel it.   ·
+  ·                                       ·
+  · · · · · · · · · · · · · · · · · · · · · · · ·
+```
+
+[![Ko-fi](https://img.shields.io/badge/☕_Ko--fi-Fuel_the_Flow-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/avinashvelu)
+[![GitHub Sponsors](https://img.shields.io/badge/⚡_Sponsor-Power_Up-EA4AAA?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/Avinashvelu03)
+
+**No budget? No problem:**
+- ⭐ [Star FlowX](https://github.com/Avinashvelu03/flowx-control) — boosts discovery
+- 🐛 [Open an issue](https://github.com/Avinashvelu03/flowx-control/issues) — shape the roadmap
+- 🗣️ Tell a dev who ships async code
+
+*Built solo, shipped free — by [Avinash Velu](https://github.com/Avinashvelu03)*
+
+</div>
