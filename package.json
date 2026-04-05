@@ -108,8 +108,9 @@
     "test": "jest --coverage",
     "test:ci": "jest --coverage",
     "lint": "eslint src/ --ext .ts",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\" \"__tests__/**/*.ts\"",
-    "typecheck": "tsc --noEmit"
+    "prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "keywords": [
     "async",
